@@ -1,0 +1,126 @@
+#!/bin/bash
+
+set -e
+
+WEBSYNC_FILE=.websync
+WEBSYNC_IGNORE=.websyncignore
+WEBSYNC_GLOBAL_FILE=$HOME/.websyncglobal
+
+
+function error (){
+    echo $1
+    exit 1
+}
+
+function read_ignored_files() {
+    if [[ -f $WEBSYNC_IGNORE ]]; then
+        exclude_command=  
+
+        while read line 
+        do
+            if [[ -n $line ]]; then
+                exclude_command="--exclude $line $exclude_command"
+            fi
+        done < $WEBSYNC_IGNORE
+    fi
+}
+
+function do_sync() {
+    if [[ -f $WEBSYNC_FILE ]]; then
+        load_conf $WEBSYNC_FILE
+
+        read_ignored_files
+
+        cmd="rsync -r -v $exclude_command * $user@$host:$root_folder/."
+        printf "$cmd\n"
+        $cmd
+        echo "Done"
+    else
+        error "Can't find $WEBSYNC_FILE"
+    fi
+}
+
+
+function read_var {
+    printf "$1"
+    if [[ -n $3 ]]; then
+        printf " [$3]: "
+    else
+        printf ": "
+    fi
+    read input
+
+    if [[ -n $3 && -z $input ]]; then
+        input=$3
+    fi
+
+    eval "$2=\$input"
+}
+
+function init() {
+    if [[ -f $WEBSYNC_FILE ]]; then
+        load_conf $WEBSYNC_FILE
+    else
+        if [[ -f $WEBSYNC_GLOBAL_FILE ]]; then
+            load_conf $WEBSYNC_GLOBAL_FILE 
+            current_dir=${PWD##*/}
+            root_folder=$root_folder/$current_dir
+        fi
+    fi
+
+    read_input_and_save $WEBSYNC_FILE
+}
+
+function load_conf() {
+    . "$1"
+}
+
+function global_init() {
+
+    root_folder="./"
+    user=root
+    host=localhost
+
+    if [[ -f $WEBSYNC_GLOBAL_FILE ]]; then
+        load_conf $WEBSYNC_GLOBAL_FILE
+    fi
+
+    read_input_and_save $WEBSYNC_GLOBAL_FILE
+}
+
+function read_input_and_save() {
+    output="$1"
+    read_var "Enter remote folder root path" root_folder $root_folder
+    read_var "Enter remote user" user $user
+    read_var "Enter remote host" host $host
+
+    touch $output
+    echo "" > $output
+    echo "root_folder=$root_folder" >> $output
+    echo "user=$user" >> $output
+    echo "host=$host" >> $output
+
+
+    echo ""
+    echo "Saved properties to $output"
+    cat $output
+}
+
+
+function show_help() {
+    echo websync is used for easier websyte uploading to your servers
+    echo "  init: Inits websync configuration for current folder"
+}
+
+case "$1" in
+    init)
+        init
+        ;;
+    global)
+        echo "Setting global properties"
+        global_init
+        ;;
+    *)
+        do_sync 
+        ;;
+esac

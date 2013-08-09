@@ -35,6 +35,11 @@ function addLicenseToFile {
 }
 
 
+function findFilesForType {
+    find ./ -name "*.$1"
+}
+
+
 
 FILE_TYPE=java
 
@@ -56,7 +61,7 @@ year=`date +%Y`
 sed "s/< YEAR >/$year/g" .ltpl > temp_license
 
 #iterating through all files matching specified file type and applying license headers to them 
-for file in $(find ./ -name "*.$FILE_TYPE") ; do
+for file in $( findFilesForType "$FILE_TYPE" ) ; do
     addLicenseToFile $file
 done
 
